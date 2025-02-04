@@ -1,10 +1,9 @@
 <div align="center">
-# fb_boot - (FB_CHATBOT)
+fb_boot - (FB CHATBOT)
 
-It's a FB CHATBOOT using [Google_GEMINI-AI_API](https://aistudio.google.com/app/apikey)
+This is a Facebook chatbot using the [Google_GEMINI-AI_API](https://aistudio.google.com/app/apikey)
 
-It's using a modefied version of fbchat_muqit, It can use an encrypted cookies.json.
-
+It uses a modified version of fbchat_muqit and can work with an encrypted cookies.json.
 Here is the original version: [fb_muqit](https://github.com/togashigreat/fbchat-muqit?tab=BSD-3-Clause-2-ov-file)
         
 </div>
