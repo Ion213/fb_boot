@@ -73,7 +73,7 @@ python3 app.py
 
 ## 💬 Chat Usage  
 - `. your_chat_here` → **Prefix your message with `.` to chat with AI**  
-- 🚀 More chat features **coming soon**...  
+- 🚀 More chat Usage **coming soon**...  
 ---
 
 ## 🛠️ Commands (Threads/Group Chat)  
@@ -87,11 +87,13 @@ python3 app.py
 
 ---
 
-## 🔍 Message Filtering  
+## ⚙️ Chat Features  
 
-- **Block bad words** → You can add words to block in `__init__.py`  
-- **Block spam** → Adjust spam detection settings, including message repetition limits and bot warning cooldown, in `__init__.py`  
+- **Bad Word Filtering** → Customize blocked words in `__init__.py`.  
+- **Spam Prevention** → Adjust repetition limits and bot warning cooldown in `__init__.py`.  
 
+🔹 **More Chat Features coming soon...** 🚀  
+---
 
 ## Requirements:
 - google-generativeai
