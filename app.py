@@ -1,4 +1,5 @@
-#original cannot use the cookies.json in list or array 
+#original 
+# cannot use the encrypted
 
 '''
 import asyncio
@@ -29,7 +30,8 @@ if __name__ == "__main__":
 
 '''
 
-
+#modefied
+# can use the encrypted
 import asyncio
 from fb_chatbot import Chat,secret_key,api_key  # Import your bot class
 import os
