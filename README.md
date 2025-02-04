@@ -93,6 +93,7 @@ python3 app.py
 - **Spam Prevention** → Adjust repetition limits and bot warning cooldown in `__init__.py`.  
 
 🔹 **More Chat Features coming soon...** 🚀  
+
 ---
 
 ## Requirements:
