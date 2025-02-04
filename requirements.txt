@@ -1,0 +1,4 @@
+fbchat-muqit 
+google-generativeai
+python-dotenv
+cryptography
