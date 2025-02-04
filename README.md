@@ -65,11 +65,35 @@ source encrypt.sh #It will create encrypted_cookies.bin and secret_key.key
 ```
 ⚠️ Note: After encryption, make sure to store your 'secret_key' and 'cookies.json' in a secure location. Ensure that the path where these files are kept is not publicly accessible, especially if you're deploying on a hosting server. This will help prevent unauthorized access and keep your sensitive data safe.
 
-## RUN THE APP:
+### RUN THE APP:
 ```python
 #source venv/bin/activate required
 python3 app.py
 ```
+
+## 💬 Chat Usage  
+- `. your_chat_here` → **Chat with AI**  
+- 🚀 More chat features **coming soon**...  
+
+---
+
+## 🛠️ Commands (Threads/Group Chat)  
+
+- `/name group_name` → **Change group name**  
+- `/add user_id` → **Add a user**  
+- `/remove user_id` → **Remove a user**  
+- `/emoji 🤖` → **Change group emoji**  
+
+🔹 **More commands coming soon...** 🚀  
+
+---
+
+## 🔍 Message Filtering  
+
+- **Block bad words** → You can add words to block in `__init__.py`  
+- **Block spam** → Adjust spam detection settings, including message repetition limits and bot warning cooldown, in `__init__.py`  
+
+
 
 ## Requirements:
 - google-generativeai
