@@ -1,5 +1,5 @@
 #for original fbchat_muqit
-# cannot use the encrypted only use cookies.json
+# cannot use the encrypted_cookies.bin, only use cookies.json not secure for online hosting
 '''
 import asyncio
 from fb_chatbot import Chat  # Import your bot class
@@ -30,7 +30,7 @@ if __name__ == "__main__":
 '''
 
 #for modefied
-# can use the encrypted
+# can use the encrypted good for online hosting
 import asyncio
 from fb_chatbot import Chat,secret_key,api_key  # Import your bot class
 import os
