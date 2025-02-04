@@ -4,3 +4,4 @@ cryptography
 
 
 #fbchat-muqit     <----uncomment this if you are using original fbchat_muqit
+./fbchat-muqit

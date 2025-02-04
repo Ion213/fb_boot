@@ -11,7 +11,7 @@ For reference, here is the original version: [fbchat_muqit](https://github.com/t
 
 </div>
 
-## 🛠️ Documentation
+## 📄 Documentation
 Here's the official fbchat_muqit Docs:
     [Read Documentation](http://fbchat-muqit.rtfd.io/)
 
