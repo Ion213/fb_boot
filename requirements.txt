@@ -2,4 +2,5 @@ google-generativeai
 python-dotenv
 cryptography
 
-#fbchat-muqit
+
+#fbchat-muqit     <----uncomment this if you are using original fbchat_muqit
