@@ -27,7 +27,7 @@ cd fb_boot
 python3 -m venv venv
 source venv/bin/activate
 
-#change the directory to fbchat-muqit to install the modefied fbchat-muqit
+#change the directory to fbchat-muqit to install the modified fbchat-muqit
 cd fbchat-muqit
 pip install .
 
