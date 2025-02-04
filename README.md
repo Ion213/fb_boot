@@ -1,11 +1,14 @@
 <div align="center">
-fb_boot - (FB CHATBOT)
 
-This is a Facebook chatbot using the [Google_GEMINI-AI_API](https://aistudio.google.com/app/apikey)
+# fb_boot - (FB CHATBOT)
 
-It uses a modified version of fbchat_muqit and can work with an encrypted cookies.json.
-Here is the original version: [fb_muqit](https://github.com/togashigreat/fbchat-muqit?tab=BSD-3-Clause-2-ov-file)
-        
+A Facebook chatbot powered by the [Google GEMINI-AI API](https://aistudio.google.com/app/apikey).
+
+It utilizes a modified version of `fbchat_muqit` and supports encrypted `cookies.json` for authentication.  
+For reference, here is the original version: [fb_muqit](https://github.com/togashigreat/fbchat-muqit?tab=BSD-3-Clause-2-ov-file).
+
+This is an early release, and several features are still in development. As this is an unofficial API, we are not responsible for any account restrictions or bans imposed by Facebook. We strongly recommend using a dedicated or secondary Facebook account.
+
 </div>
 
 ## 🛠️ Documentation
