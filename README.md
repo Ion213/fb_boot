@@ -65,10 +65,12 @@ source encrypt.sh #It will create encrypted_cookies.bin and secret_key.key
 ```
 ⚠️ Note: After encryption, make sure to store your 'secret_key' and 'cookies.json' in a secure location. Ensure that the path where these files are kept is not publicly accessible, especially if you're deploying on a hosting server. This will help prevent unauthorized access and keep your sensitive data safe.
 
-### RUN THE APP:
+## RUN THE APP:
 ```python
 #source venv/bin/activate required
 python3 app.py
+#or
+source run.sh
 ```
 
 ## 💬 Chat Usage  
