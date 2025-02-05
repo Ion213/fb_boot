@@ -1,7 +1,8 @@
 import os
 import time
 
-from fbchat_muqit import Client, Message, ThreadType
+
+from fbchat_muqit import Client, Message, ThreadType,FileAttachment
 
 import google.generativeai as genai
 from dotenv import load_dotenv
@@ -77,3 +78,4 @@ class Chat(Client):
             if user_message.startswith("."):
                 await ai_chats(self, author_id, user_message, thread_id, thread_type, message_object, model)
                 return
+            

@@ -1,9 +1,0 @@
-__pycache__/
-*.pyc
-*.pyo
-.venv/
-poetry.lock
-ep.py
-dist/
-build/
-*.egg-info/

@@ -1,8 +1,0 @@
-aiohttp
-aiomqtt
-Sphinx
-Sphinx-rtd-theme
-furo
-aenum
-yarl
-
