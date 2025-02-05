@@ -74,7 +74,8 @@ source run.sh
 ```
 
 ## 💬 Chat Usage  
-- `. your_chat_here` → **Prefix your message with `.` to chat with AI**  
+- `. your_chat_here` → **Prefix your message with `.` to chat with AI** 
+- `send_youtube_shorts_link` → **Youtube video downloader**  
 - 🚀 More chat Usage **coming soon**...  
 ---
 
@@ -103,6 +104,8 @@ source run.sh
 - python-dotenv
 - cryptography
 - fbchat-muqit
+- bs4
+- random
 
 ### License:
 
