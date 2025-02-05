@@ -100,6 +100,7 @@ source run.sh
 - fbchat-muqit
 - bs4
 - random
+- requests
 
 ### License:
 
