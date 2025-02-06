@@ -2,7 +2,6 @@ google-generativeai
 python-dotenv
 cryptography
 requests
-re
 bs4
 
 
