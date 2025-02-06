@@ -1,0 +1,191 @@
+%ENIP Tests
+
++Syntax check
+= Import the enip layer
+
+from scapy.contrib.enipTCP import *
+#from scapy.all import *
+
+
++ Test ENIP/TCP Encapsulation Header
+= Encapsulation Header Default Values
+pkt=ENIPTCP()
+assert pkt.commandId == None
+assert pkt.length == 0
+assert pkt.session == 0
+assert pkt.status == None
+assert pkt.senderContext == 0
+assert pkt.options == 0
+
+
++ ENIP List Services 0x0004
+= ENIP List Services Reply Command ID
+pkt=ENIPTCP()
+pkt.commandId=0x4
+assert pkt.commandId == 0x4
+
+= ENIP List Services Default Values
+pkt=ENIPListServices()
+assert pkt.itemCount == 0
+
+= ENIP List Services Custom Values
+pkt.items.append(ENIPListServicesItem(serviceName=b'test'))
+assert pkt.items[0].itemTypeCode == 0
+assert pkt.items[0].itemLength == 0
+assert pkt.items[0].protocolVersion == 0
+assert pkt.items[0].flag == 0
+assert pkt.items[0].serviceName == b'test'
+
+
++ ENIP List Identity 0x0063
+= ENIP List Identity Reply Command ID
+pkt=ENIPTCP()
+pkt.commandId=0x63
+assert pkt.commandId == 0x63
+assert raw(pkt) == b"c\x00\x00\x00\x00\x00\x00\x00\x00\x00" \
+b"\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"
+
+= ENIP List Identity Default Values
+pkt=ENIPListIdentity()
+assert pkt.itemCount == 0
+
+= ENIP List Identity Custom Values
+pkt=ENIPListIdentityItem(sinAddress="192.168.1.1",
+		productNameLength=4, productName=b"test")
+assert pkt.protocolVersion == 0
+assert pkt.sinAddress == "192.168.1.1"
+assert pkt.productNameLength == 4
+assert pkt.productName == b'test'
+
+
++ ENIP List Interfaces
+= ENIP List Interfaces Reply Command ID
+pkt=ENIPTCP()
+pkt.commandId=0x64
+assert pkt.commandId == 0x64
+
+= ENIP List Interfaces Reply Default Values
+pkt=ENIPListInterfaces()
+assert pkt.itemCount == 0
+
+= ENIP List Interfaces Reply Items Default Values
+pkt=ENIPListInterfacesItem(itemTypeCode=0x0c)
+assert pkt.itemTypeCode == 0x0c
+assert pkt.itemLength == 0
+assert pkt.itemData == b''
+
+
++ ENIP Register Session
+= ENIP Register Session Command ID
+pkt=ENIPTCP()
+pkt.commandId=0x65
+assert pkt.commandId == 0x65
+
+= ENIP Register Session Default Values
+pkt=ENIPRegisterSession()
+assert pkt.protocolVersion == 1
+assert pkt.options == 0
+
+= ENIP Register Session Request
+registerSessionReqPkt = b'\x65\x00\x04\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x01\x00\x00\x00'
+
+pkt = ENIPTCP(registerSessionReqPkt)
+assert pkt.commandId == 0x65
+assert pkt.length == 4
+assert pkt.session == 0
+assert pkt.status == 0
+assert pkt.senderContext == 0
+assert pkt.options == 0
+assert pkt[ENIPRegisterSession].protocolVersion == 1
+assert pkt[ENIPRegisterSession].options == 0
+
+= ENIP Register Session Reply
+registerSessionRepPkt = b'\x65\x00\x04\x00\x7b\x9a\x4e\xa1\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x01\x00\x00\x00'
+
+pkt = ENIPTCP(registerSessionRepPkt)
+assert pkt.commandId == 0x65
+assert pkt.length == 4
+assert pkt.session == 0xa14e9a7b
+assert pkt.status == 0
+assert pkt.senderContext == 0
+assert pkt.options == 0
+assert pkt[ENIPRegisterSession].protocolVersion == 1
+assert pkt[ENIPRegisterSession].options == 0
+raw(pkt)
+
+
++ ENIP Send RR Data
+= ENIP Send RR Data Command ID
+pkt=ENIPTCP()
+pkt.commandId=0x6f
+assert pkt.commandId == 0x6f
+
+= ENIP Send RR Data Default Values
+pkt=ENIPSendRRData()
+assert pkt.interface == 0
+assert pkt.timeout == 255
+assert pkt.itemCount == 0
+
+= ENIP Send RR Data Request
+sendRRDataReqPkt = b'\x6f\x00\x3e\x00\x7b\x9a\x4e\xa1\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x02\x00\x00\x00\x00\x00\xb2\x00\x2e\x00'
+pkt = ENIPTCP(sendRRDataReqPkt)
+assert pkt.commandId == 0x6f
+assert pkt.length == 62
+assert pkt.session == 0xa14e9a7b
+assert pkt.status == 0
+assert pkt.senderContext == 0
+assert pkt.options == 0
+assert pkt.interface == 0
+assert pkt.timeout == 0
+assert pkt.itemCount == 2
+
+= ENIP Send RR Data Reply
+sendRRDataRepPkt = b'\x6f\x00\x2e\x00\x7b\x9a\x4e\xa1\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x04\x02\x00\x00\x00\x00\x00\xb2\x00\x1e\x00'
+
+pkt = ENIPTCP(sendRRDataRepPkt)
+assert pkt.commandId == 0x6f
+assert pkt.length == 46
+assert pkt.session == 0xa14e9a7b
+assert pkt.status == 0
+assert pkt.senderContext == 0
+assert pkt.options == 0
+assert pkt.interface == 0
+assert pkt.timeout == 1024
+assert pkt.items[0].typeId == 0
+assert pkt.items[0].length == 0
+assert pkt.items[1].typeId == 0x00b2
+assert pkt.items[1].length == 30
+
+
++ ENIP Send Unit Data
+= ENIP Send Unit Data Command ID
+pkt=ENIPTCP()
+pkt.commandId=0x70
+assert pkt.commandId == 0x70
+
+= ENIP Send Unit Data Default Values
+pkt=ENIPSendUnitData()
+assert pkt.interface == 0
+assert pkt.timeout == 255
+assert pkt.itemCount == 0
+
+= ENIP Send Unit Data
+sendUnitDataPkt = b'\x70\x00\x2d\x00\x7b\x9a\x4e\xa1\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x02\x00\xa1\x00\x04\x00\xcc\x60\x9a\x7b\xb1\x00\x19\x00\x01\x00'
+
+pkt = ENIPTCP(sendUnitDataPkt)
+assert pkt.commandId == 0x70
+assert pkt.length == 45
+assert pkt.session == 0xa14e9a7b
+assert pkt.status == 0
+assert pkt.senderContext == 0
+assert pkt.options == 0
+assert pkt.interface == 0
+assert pkt.timeout == 0
+assert pkt.itemCount == 2
+
+assert pkt.items[0].typeId == 0x00a1
+assert pkt.items[0].length == 4
+assert pkt.items[0].data == b'\x7b\x9a\x60\xcc'
+assert pkt.items[1].typeId == 0x00b1
+assert pkt.items[1].length == 25
+assert pkt.items[1].data == b'\x00\x01'

@@ -1,0 +1,101 @@
+% NETBIOS regression tests for Scapy
+
+# More information at http://www.secdev.org/projects/UTscapy/
+
+############
+############
++ Netbios tests
+
+= NBNSQueryRequest - build & dissect
+
+z = NBNSHeader()/NBNSQueryRequest(SUFFIX="file server service", QUESTION_NAME='TEST1', QUESTION_TYPE='NB')
+
+assert raw(z) == b'\x00\x00\x01\x10\x00\x01\x00\x00\x00\x00\x00\x00 FEEFFDFEDBCACACACACACACACACACACA\x00\x00 \x00\x01'
+
+pkt = IP(dst='192.168.0.255')/UDP(sport=137, dport='netbios_ns')/z
+pkt = IP(raw(pkt))
+assert pkt.QUESTION_NAME == b'TEST1'
+assert pkt[NBNSQueryRequest].mysummary() == r"NBNSQueryRequest who has '\\TEST1'"
+
+assert NBNSQueryRequest in NBNSHeader(raw(z))
+
+z = NBNSQueryRequest(b' PPCACACACACACACACACACACACACACAAA\x00\x00 \x00\x01')
+assert z.mysummary() == r"NBNSQueryRequest who has '\\\xff'"
+
+= NBNSQueryResponse - build & dissect
+
+z = NBNSHeader()/NBNSQueryResponse(RR_NAME="FRED", ADDR_ENTRY=[NBNS_ADD_ENTRY(NB_ADDRESS="192.168.0.13")])
+
+assert raw(z) == b'\x00\x00\x85\x00\x00\x00\x00\x01\x00\x00\x00\x00 EGFCEFEECACACACACACACACACACACAAA\x00\x00 \x00\x01\x00\x04\x93\xe0\x00\x06\x00\x00\xc0\xa8\x00\r'
+pkt = NBNSHeader(raw(z))
+assert NBNSQueryResponse in pkt
+assert pkt.ADDR_ENTRY[0].NB_ADDRESS == "192.168.0.13"
+assert pkt[NBNSQueryResponse].mysummary() == r"NBNSQueryResponse '\\FRED' is at 192.168.0.13"
+
+z = NBNSQueryResponse(b' PPFCEFEECACACACACACACACACACACAAA\x00\x00 \x00\x01\x00\x04\x93\xe0\x00\x06\x00\x00\xc0\xa8\x00\r')
+assert z.mysummary() == r"NBNSQueryResponse '\\\xffRED' is at 192.168.0.13"
+
+z = NBNSHeader(b'/S\x85\x80\x00\x00\x00\x01\x00\x00\x00\x00 FAEPFEEBFEEPCACACACACACACACACAAA\x00\x00 \x00\x01\x00\x03\xf4\x80\x00\x06\x00\x00\xc0\xa8\x01A')
+assert z.RR_NAME == b'POTATO'
+assert z.ADDR_ENTRY[0].G == 0
+assert z.ADDR_ENTRY[0].NB_ADDRESS == "192.168.1.65"
+
+= NBNSQueryResponse answers NBNSQueryRequest
+
+req = IP(ihl=5, len=78, proto=17, chksum=8562, src='172.19.0.7', dst='172.19.0.255')/UDP(sport=137, dport=137, len=58, chksum=62101)/NBNSHeader(NM_FLAGS=17, QDCOUNT=1)/NBNSQueryRequest(QUESTION_NAME=b'Loremipsumdolor', SUFFIX=17217)
+resp = IP(b'E\x00\x00Zn\xab@\x00@\x11s\xb5\xac\x13\x00\x05\xac\x13\x00\x07\x00\x89\x00\x89\x00FX\x8a\x00\x00\x85\x00\x00\x00\x00\x01\x00\x00\x00\x00 EMGPHCGFGNGJHAHDHFGNGEGPGMGPHCCA\x00\x00 \x00\x01\x00\x00\x00\xa5\x00\x06\x00\x00\xac\x13\x00\x05')
+
+try:
+    conf.checkIPaddr = True
+    assert not resp.answers(req)
+    conf.checkIPaddr = False
+    assert resp.answers(req)
+finally:
+    conf.checkIPaddr = True
+
+= NBNSQueryResponse answers long NBNSQueryRequest
+
+req = IP(ihl=5, len=78, proto=17, chksum=8562, src='172.19.0.7', dst='172.19.0.255')/UDP(sport=137, dport=137, len=58, chksum=62101)/NBNSHeader(NM_FLAGS=17, QDCOUNT=1)/NBNSQueryRequest(QUESTION_NAME=b'Loremipsumdolorsitamet', SUFFIX=17217)
+resp = IP(b'E\x00\x00Zn\xab@\x00@\x11s\xb5\xac\x13\x00\x05\xac\x13\x00\x07\x00\x89\x00\x89\x00FX\x8a\x00\x00\x85\x00\x00\x00\x00\x01\x00\x00\x00\x00 EMGPHCGFGNGJHAHDHFGNGEGPGMGPHCCA\x00\x00 \x00\x01\x00\x00\x00\xa5\x00\x06\x00\x00\xac\x13\x00\x05')
+
+try:
+    conf.checkIPaddr = True
+    assert not resp.answers(req)
+    conf.checkIPaddr = False
+    assert resp.answers(req)
+finally:
+    conf.checkIPaddr = True
+
+= NBNSNodeStatusResponse - build & dissect
+
+z = NBNSHeader()/NBNSNodeStatusResponse(NODE_NAME=[NBNSNodeStatusResponseService(NETBIOS_NAME="WINDOWS")], MAC_ADDRESS="aa:aa:aa:aa:aa:aa")
+assert raw(z) == b'\x00\x00\x84\x00\x00\x00\x00\x01\x00\x00\x00\x00 HHGJGOGEGPHHHDCACACACACACACACAAA\x00\x00!\x00\x01\x00\x00\x00\x00\x00S\x01WINDOWS\x00\x00\x00\x00\x00\x00\x00\x00\x00\x04\x00\xaa\xaa\xaa\xaa\xaa\xaa\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00'
+pkt = NBNSHeader(raw(z))
+assert pkt.NODE_NAME[0].NETBIOS_NAME == b'WINDOWS\x00\x00\x00\x00\x00\x00\x00\x00'
+assert NBNSNodeStatusResponse in pkt
+
+= NBNSNodeStatusRequest - build and answers
+
+pkt = UDP()/NBNSHeader()/NBNSNodeStatusRequest()
+assert raw(pkt.payload) == b'\x00\x00\x00\x10\x00\x01\x00\x00\x00\x00\x00\x00 CKAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA\x00\x00!\x00\x01'
+assert pkt[NBNSNodeStatusRequest].mysummary() == "NBNSNodeStatusRequest who has '\\\\*\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00'"
+
+resp = UDP(b'\x00\x89\x00\x89\x00\xc9v>\x00\x00\x84\x00\x00\x00\x00\x01\x00\x00\x00\x00 CKAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA\x00\x00!\x00\x01\x00\x00\x00\x00\x00\x89\x05DOMAIN         \x00\x84\x00SRV1           \x00\x04\x00DOMAIN         \x1c\x84\x00SRV1            \x04\x00DOMAIN         \x1b\x04\x00RT\x00iX\x13\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00')
+assert [x.NETBIOS_NAME.strip() for x in resp.NODE_NAME] == [b'DOMAIN', b'SRV1', b'DOMAIN', b'SRV1', b'DOMAIN']
+assert resp.answers(pkt)
+
+z = NBNSNodeStatusRequest(b' PPCACACACACACACACACACACACACACAAA\x00\x00!\x00\x01')
+assert z.mysummary() == r"NBNSNodeStatusRequest who has '\\\xff'"
+
+= NBNSWackResponse - build & dissect
+
+z = NBNSHeader()/NBNSWackResponse(RR_NAME="SARAH")
+assert raw(z) == b'\x00\x00\xbc\x00\x00\x00\x00\x01\x00\x00\x00\x00 FDEBFCEBEICACACACACACACACACACAAA\x00\x00 \x00\x01\x00\x00\x00\x02\x00\x02)\x10'
+pkt = NBNSHeader(raw(z))
+assert pkt[NBNSWackResponse].RR_NAME == b'SARAH'
+
+= NBTSession
+
+z = raw(TCP()/NBTSession())
+assert z == b'\x00\x8b\x00\x8b\x00\x00\x00\x00\x00\x00\x00\x00P\x02 \x00\x00\x00\x00\x00\x00\x00\x00\x00'
+assert NBTSession in TCP(z)

@@ -1,0 +1,859 @@
+% LLDP test campaign
+
+#
+# execute test:
+# > test/run_tests -P "load_contrib('lldp')" -t test/contrib/lldp.uts
+#
+
++ Basic layer handling
+= build basic LLDP frames
+
+frm = Ether(src='01:01:01:01:01:01', dst=LLDP_NEAREST_BRIDGE_MAC)/ \
+      LLDPDUChassisID(subtype=LLDPDUChassisID.SUBTYPE_MAC_ADDRESS, id=b'\x06\x05\x04\x03\x02\x01') / \
+      LLDPDUPortID(subtype=LLDPDUPortID.SUBTYPE_MAC_ADDRESS, id=b'\x01\x02\x03\x04\x05\x06')/\
+      LLDPDUTimeToLive()/\
+      LLDPDUSystemName(system_name='mate')/\
+      LLDPDUSystemCapabilities(telephone_available=1, router_available=1, telephone_enabled=1)/\
+      LLDPDUManagementAddress(
+            management_address_subtype=LLDPDUManagementAddress.SUBTYPE_MANAGEMENT_ADDRESS_IPV4,
+            management_address='1.2.3.4',
+            interface_numbering_subtype=LLDPDUManagementAddress.SUBTYPE_INTERFACE_NUMBER_IF_INDEX,
+            interface_number=23,
+            object_id='abcd') / \
+      LLDPDUEndOfLLDPDU()
+
+frm = frm.build()
+frm = Ether(frm)
+
+= build: check length calculation (#GH3107)
+
+frame = Ether(src='aa:bb:cc:dd:ee:ff', dst='11:22:33:44:55:66') / \
+        LLDPDUChassisID(subtype=0x04, id='aa:bb:cc:dd:ee:ff') / \
+        LLDPDUPortID(subtype=0x05, id='1') / \
+        LLDPDUTimeToLive(ttl=5) / \
+        LLDPDUManagementAddress(management_address_subtype=0x01, management_address=socket.inet_aton('192.168.0.10'))
+data = b'\x11"3DUf\xaa\xbb\xcc\xdd\xee\xff\x88\xcc\x02\x07\x04\xaa\xbb\xcc\xdd\xee\xff\x04\x02\x051\x06\x02\x00\x05\x10\x0c\x05\x01\xc0\xa8\x00\n\x01\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00'
+assert bytes(frame) == data
+
+= add padding if required
+
+conf.contribs['LLDP'].strict_mode_disable()
+frm = Ether(src='01:01:01:01:01:01', dst=LLDP_NEAREST_BRIDGE_MAC) / \
+      LLDPDUPortID(subtype=LLDPDUPortID.SUBTYPE_INTERFACE_NAME, id='eth0') / \
+      LLDPDUChassisID(subtype=LLDPDUChassisID.SUBTYPE_MAC_ADDRESS, id='06:05:04:03:02:01') / \
+      LLDPDUTimeToLive() / \
+      LLDPDUEndOfLLDPDU()
+assert len(raw(frm)) == 60
+assert len(raw(Ether(raw(frm))[Padding])) == 24
+
+frm = Ether(src='01:01:01:01:01:01', dst=LLDP_NEAREST_BRIDGE_MAC) / \
+      LLDPDUPortID(subtype=LLDPDUPortID.SUBTYPE_INTERFACE_NAME, id='eth012345678901234567890123') / \
+      LLDPDUChassisID(subtype=LLDPDUChassisID.SUBTYPE_MAC_ADDRESS, id='06:05:04:03:02:01') / \
+      LLDPDUTimeToLive() / \
+      LLDPDUEndOfLLDPDU()
+assert (len(raw(frm)) == 60)
+assert (len(raw(Ether(raw(frm))[Padding])) == 1)
+
+frm = Ether(src='01:01:01:01:01:01', dst=LLDP_NEAREST_BRIDGE_MAC) / \
+      LLDPDUPortID(subtype=LLDPDUPortID.SUBTYPE_INTERFACE_NAME, id='eth0123456789012345678901234') / \
+      LLDPDUChassisID(subtype=LLDPDUChassisID.SUBTYPE_MAC_ADDRESS, id='06:05:04:03:02:01') / \
+      LLDPDUTimeToLive() / \
+      LLDPDUEndOfLLDPDU()
+assert (len(raw(frm)) == 60)
+try:
+      Ether(raw(frm))[Padding]
+      assert False
+except IndexError:
+      pass
+
+= Dissection: PtopoChassisIdType == chasIdPtopoGenAddr(5)
+
+data = hex_bytes("0180c200000e00192fa7b28d88cc0206050101020304040d0155706c696e6b20746f205331060200780a0c53322e636973636f2e636f6d0cbe436973636f20494f5320536f6674776172652c20433335363020536f667477617265202843333536302d414456495053455256494345534b392d4d292c2056657273696f6e2031322e322834342953452c2052454c4541534520534f4654574152452028666331290a436f707972696768742028632920313938362d3230303820627920436973636f2053797374656d732c20496e632e0a436f6d70696c6564205361742030352d4a616e2d30382030303a3135206279207765696c697508134769676162697445746865726e6574302f31330e0400140004fe060080c2010001fe0900120f0103c03600100000")
+pkt = Ether(data)
+
+assert pkt.family == 1
+assert pkt.id == "1.2.3.4"
+
+= Advanced test: check definitions and length of complex IDs
+
+pkt = Ether()/LLDPDUChassisID(id="ff:dd:ee:bb:aa:99", subtype=0x04)/LLDPDUPortID(subtype=0x03, id="aa:bb:cc:dd:ee:ff")/LLDPDUTimeToLive(ttl=120)/LLDPDUEndOfLLDPDU()
+pkt = Ether(raw(pkt))
+assert pkt[LLDPDUChassisID].fields_desc[2].i2s == LLDPDUChassisID.LLDP_CHASSIS_ID_TLV_SUBTYPES
+assert pkt[LLDPDUPortID].fields_desc[2].i2s == LLDPDUPortID.LLDP_PORT_ID_TLV_SUBTYPES
+assert pkt[LLDPDUChassisID]._length == 7
+assert pkt[LLDPDUPortID]._length == 7
+
+= Network families / addresses in IDs
+
+# IPv4
+
+pkt = Ether()/LLDPDUChassisID(subtype=0x05, family=1, id="1.1.1.1")/LLDPDUPortID(subtype=0x04, family=1, id="2.2.2.2")/LLDPDUTimeToLive()/LLDPDUEndOfLLDPDU()
+pkt = Ether(raw(pkt))
+assert pkt[LLDPDUChassisID].id == "1.1.1.1"
+assert pkt[LLDPDUPortID].id == "2.2.2.2"
+
+pkt = Ether(hex_bytes(b'ffffffffffff0242ac11000288cc02060501010101010406040102020202060200140000'))
+assert pkt[LLDPDUChassisID].id == "1.1.1.1"
+assert pkt[LLDPDUPortID].id == "2.2.2.2"
+
+try:
+      pkt = Ether()/LLDPDUChassisID(subtype=0x05, family=1, id="2001::abcd")/LLDPDUPortID()/LLDPDUTimeToLive()/LLDPDUEndOfLLDPDU()
+      assert False
+except (socket.gaierror, AssertionError):
+      pass
+
+try:
+      pkt = Ether()/LLDPDUChassisID()/LLDPDUPortID(subtype=0x04, family=1, id="2001::abcd")/LLDPDUTimeToLive()/LLDPDUEndOfLLDPDU()
+      assert False
+except (socket.gaierror, AssertionError):
+      pass
+
+# IPv6
+
+pkt = Ether()/LLDPDUChassisID(subtype=0x05, family=2, id="1111::2222")/LLDPDUPortID(subtype=0x04, family=2, id="2001::abcd")/LLDPDUTimeToLive()/LLDPDUEndOfLLDPDU()
+pkt = Ether(raw(pkt))
+assert pkt[LLDPDUChassisID].id == "1111::2222"
+assert pkt[LLDPDUPortID].id == "2001::abcd"
+
+pkt = Ether(hex_bytes(b'ffffffffffff0242ac11000288cc0212050211110000000000000000000000002222041204022001000000000000000000000000abcd060200140000'))
+assert pkt[LLDPDUChassisID].id == "1111::2222"
+assert pkt[LLDPDUPortID].id == "2001::abcd"
+
+try:
+      pkt = Ether()/LLDPDUChassisID(subtype=0x05, family=2, id="1.1.1.1")/LLDPDUPortID()/LLDPDUTimeToLive()/LLDPDUEndOfLLDPDU()
+      assert False
+except (socket.gaierror, AssertionError):
+      pass
+
+try:
+      pkt = Ether()/LLDPDUChassisID()/LLDPDUPortID(subtype=0x04, family=2, id="1.1.1.1")/LLDPDUTimeToLive()/LLDPDUEndOfLLDPDU()
+      assert False
+except (socket.gaierror, AssertionError):
+      pass
+
+# Other
+
+pkt = Ether()/LLDPDUChassisID(subtype=0x05, id=b"\x00\x07\xab")/LLDPDUPortID(subtype=0x04, id=b"\x07\xaa\xbb\xcc")/LLDPDUTimeToLive()/LLDPDUEndOfLLDPDU()
+pkt = Ether(raw(pkt))
+assert pkt[LLDPDUChassisID].id == b"\x00\x07\xab"
+assert pkt[LLDPDUPortID].id == b"\x07\xaa\xbb\xcc"
+
+pkt = Ether(hex_bytes(b'ffffffffffff0242ac11000288cc020505000007ab0406040007aabbcc060200140000'))
+assert pkt[LLDPDUChassisID].id == b"\x00\x07\xab"
+assert pkt[LLDPDUPortID].id == b"\x07\xaa\xbb\xcc"
+
++ strict mode handling - build
+= basic frame structure
+
+conf.contribs['LLDP'].strict_mode_enable()
+
+# invalid length in LLDPDUEndOfLLDPDU
+try:
+      frm = Ether()/LLDPDUChassisID(id='slartibart')/LLDPDUPortID(id='42')/LLDPDUTimeToLive()/LLDPDUEndOfLLDPDU(_length=8)
+      frm.build()
+      assert False
+except LLDPInvalidLengthField:
+      pass
+
+# missing chassis id
+try:
+      frm = Ether()/LLDPDUChassisID()/LLDPDUPortID(id='42')/LLDPDUTimeToLive()/LLDPDUEndOfLLDPDU()
+      frm.build()
+      assert False
+except LLDPInvalidLengthField:
+      pass
+
+# missing management address
+try:
+      frm = Ether()/LLDPDUChassisID(id='slartibart')/LLDPDUPortID(id='42')/LLDPDUTimeToLive()/LLDPDUManagementAddress()/LLDPDUEndOfLLDPDU()
+      frm.build()
+      assert False
+except LLDPInvalidLengthField:
+      pass
+
++ strict mode handling - dissect
+= basic frame structure
+
+conf.contribs['LLDP'].strict_mode_enable()
+# missing PortIDTLV
+try:
+      frm = Ether() / LLDPDUChassisID(id='slartibart') / LLDPDUTimeToLive() / LLDPDUEndOfLLDPDU()
+      Ether(frm.build())
+      assert False
+except LLDPInvalidFrameStructure:
+      pass
+
+# invalid order
+try:
+      frm = Ether() / LLDPDUPortID(id='42') / LLDPDUChassisID(id='slartibart') / LLDPDUTimeToLive() / LLDPDUEndOfLLDPDU()
+      Ether(frm.build())
+      assert False
+except LLDPInvalidFrameStructure:
+      pass
+
+# layer LLDPDUPortID occurs twice
+try:
+      frm = Ether() / LLDPDUChassisID(id='slartibart') / LLDPDUPortID(id='42') / LLDPDUPortID(id='23')  / LLDPDUTimeToLive() / LLDPDUEndOfLLDPDU()
+      Ether(frm.build())
+      assert False
+except LLDPInvalidFrameStructure:
+      pass
+
+# missing LLDPDUEndOfLLDPDU
+try:
+      frm = Ether() / LLDPDUChassisID(id='slartibart') / LLDPDUPortID(id='42') / \
+            LLDPDUPortID(id='23') / LLDPDUTimeToLive() / LLDPDUEndOfLLDPDU()
+      Ether(frm.build())
+      assert False
+except LLDPInvalidFrameStructure:
+      pass
+
+conf.contribs['LLDP'].strict_mode_disable()
+frm = Ether()/LLDPDUChassisID()/LLDPDUTimeToLive()/LLDPDUEndOfLLDPDU()
+frm = Ether(frm.build())
+
+= length fields / value sizes checks
+
+conf.contribs['LLDP'].strict_mode_enable()
+# missing chassis id => invalid length
+try:
+      frm = Ether() / LLDPDUChassisID() / LLDPDUPortID(id='42') / LLDPDUTimeToLive() / LLDPDUEndOfLLDPDU()
+      Ether(frm.build())
+      assert False
+except LLDPInvalidLengthField:
+      pass
+
+# invalid length in LLDPDUEndOfLLDPDU
+try:
+      frm = Ether()/LLDPDUChassisID(id='slartibart')/LLDPDUPortID(id='42')/LLDPDUTimeToLive()/LLDPDUEndOfLLDPDU(_length=8)
+      Ether(frm.build())
+      assert False
+except LLDPInvalidLengthField:
+      pass
+
+# invalid management address
+try:
+      frm = Ether() / LLDPDUChassisID(id='slartibart') / LLDPDUPortID(id='42') / LLDPDUTimeToLive() / LLDPDUManagementAddress() / LLDPDUEndOfLLDPDU()
+      Ether(frm.build())
+      assert False
+except LLDPInvalidLengthField:
+      pass
+
+conf.contribs['LLDP'].strict_mode_disable()
+
+frm = Ether() / LLDPDUChassisID(id='slartibart') / LLDPDUPortID(id='42') / LLDPDUTimeToLive() / LLDPDUEndOfLLDPDU()
+frm = Ether(frm.build())
+
+frm = Ether() / LLDPDUChassisID() / LLDPDUPortID() / LLDPDUTimeToLive() / LLDPDUEndOfLLDPDU(_length=8)
+frm = Ether(frm.build())
+
+= test attribute values
+
+conf.contribs['LLDP'].strict_mode_enable()
+
+frm = Ether(src='01:01:01:01:01:01', dst=LLDP_NEAREST_BRIDGE_MAC)/ \
+      LLDPDUChassisID(subtype=LLDPDUChassisID.SUBTYPE_MAC_ADDRESS, id='06:05:04:03:02:01') / \
+      LLDPDUPortID(subtype=LLDPDUPortID.SUBTYPE_MAC_ADDRESS, id='01:02:03:04:05:06')/\
+      LLDPDUTimeToLive()/\
+      LLDPDUSystemName(system_name='things will')/\
+      LLDPDUSystemCapabilities(telephone_available=1,
+                               router_available=1,
+                               telephone_enabled=1,
+                               router_enabled=1)/\
+      LLDPDUManagementAddress(
+            management_address_subtype=LLDPDUManagementAddress.SUBTYPE_MANAGEMENT_ADDRESS_IPV4,
+            management_address='1.2.3.4',
+            interface_numbering_subtype=LLDPDUManagementAddress.SUBTYPE_INTERFACE_NUMBER_IF_INDEX,
+            interface_number=23,
+            object_id='burn') / \
+      LLDPDUSystemDescription(description='without tests.') / \
+      LLDPDUPortDescription(description='always!') / \
+      LLDPDUEndOfLLDPDU()
+
+frm = Ether(frm.build())
+
+assert frm[LLDPDUChassisID].id == '06:05:04:03:02:01'
+assert frm[LLDPDUPortID].id == '01:02:03:04:05:06'
+sys_capabilities = frm[LLDPDUSystemCapabilities]
+assert sys_capabilities.reserved_5_available == 0
+assert sys_capabilities.reserved_4_available == 0
+assert sys_capabilities.reserved_3_available == 0
+assert sys_capabilities.reserved_2_available == 0
+assert sys_capabilities.reserved_1_available == 0
+assert sys_capabilities.two_port_mac_relay_available == 0
+assert sys_capabilities.s_vlan_component_available == 0
+assert sys_capabilities.c_vlan_component_available == 0
+assert sys_capabilities.station_only_available == 0
+assert sys_capabilities.docsis_cable_device_available == 0
+assert sys_capabilities.telephone_available == 1
+assert sys_capabilities.router_available == 1
+assert sys_capabilities.wlan_access_point_available == 0
+assert sys_capabilities.mac_bridge_available == 0
+assert sys_capabilities.repeater_available == 0
+assert sys_capabilities.other_available == 0
+assert sys_capabilities.reserved_5_enabled == 0
+assert sys_capabilities.reserved_4_enabled == 0
+assert sys_capabilities.reserved_3_enabled == 0
+assert sys_capabilities.reserved_2_enabled == 0
+assert sys_capabilities.reserved_1_enabled == 0
+assert sys_capabilities.two_port_mac_relay_enabled == 0
+assert sys_capabilities.s_vlan_component_enabled == 0
+assert sys_capabilities.c_vlan_component_enabled == 0
+assert sys_capabilities.station_only_enabled == 0
+assert sys_capabilities.docsis_cable_device_enabled == 0
+assert sys_capabilities.telephone_enabled == 1
+assert sys_capabilities.router_enabled == 1
+assert sys_capabilities.wlan_access_point_enabled == 0
+assert sys_capabilities.mac_bridge_enabled == 0
+assert sys_capabilities.repeater_enabled == 0
+assert sys_capabilities.other_enabled == 0
+assert frm[LLDPDUManagementAddress].management_address == b'1.2.3.4'
+assert frm[LLDPDUSystemName].system_name == b'things will'
+assert frm[LLDPDUManagementAddress].object_id == b'burn'
+assert frm[LLDPDUSystemDescription].description == b'without tests.'
+assert frm[LLDPDUPortDescription].description == b'always!'
+
++ organisation specific layers
+
+= ThreeBytesEnumField tests
+
+three_b_enum_field = ThreeBytesEnumField('test', 0x00,
+                                         {
+                                             0x0e: 'fourteen',
+                                             0x00: 'zero',
+                                             0x5566: 'five-six',
+                                             0x0e0000: 'fourteen-zero-zero',
+                                             0x0e0100: 'fourteen-one-zero',
+                                             0x112233: '1#2#3'
+                                         })
+
+assert three_b_enum_field.i2repr(None, 0) == 'zero'
+assert three_b_enum_field.i2repr(None, 0x0e) == 'fourteen'
+assert three_b_enum_field.i2repr(None, 0x5566) == 'five-six'
+assert three_b_enum_field.i2repr(None, 0x112233) == '1#2#3'
+assert three_b_enum_field.i2repr(None, 0x0e0000) == 'fourteen-zero-zero'
+assert three_b_enum_field.i2repr(None, 0x0e0100) == 'fourteen-one-zero'
+assert three_b_enum_field.i2repr(None, 0x01) == '1'
+assert three_b_enum_field.i2repr(None, 0x49763) == '300899'
+
+= LLDPDUGenericOrganisationSpecific tests
+
+frm = Ether(src='01:01:01:01:01:01', dst=LLDP_NEAREST_BRIDGE_MAC)/\
+      LLDPDUChassisID(subtype=LLDPDUChassisID.SUBTYPE_MAC_ADDRESS, id=b'\x06\x05\x04\x03\x02\x01')/\
+      LLDPDUPortID(subtype=LLDPDUPortID.SUBTYPE_MAC_ADDRESS, id=b'\x01\x02\x03\x04\x05\x06')/\
+      LLDPDUTimeToLive()/\
+      LLDPDUGenericOrganisationSpecific(org_code=LLDPDUGenericOrganisationSpecific.ORG_UNIQUE_CODE_PNO,
+                                        subtype=0x42,
+                                        data=b'FooBar'*5
+                                        )/\
+      LLDPDUEndOfLLDPDU()
+
+frm = frm.build()
+frm = Ether(frm)
+org_spec_layer = frm[LLDPDUGenericOrganisationSpecific]
+assert org_spec_layer
+assert org_spec_layer._type == 127
+assert org_spec_layer.org_code == LLDPDUGenericOrganisationSpecific.ORG_UNIQUE_CODE_PNO
+assert org_spec_layer.subtype == 0x42
+assert org_spec_layer._length == 34
+
+l="A" * 24
+c=LLDPDUChassisID.SUBTYPE_CHASSIS_COMPONENT
+p=LLDPDUPortID.SUBTYPE_MAC_ADDRESS
+frm = Ether(dst=LLDP_NEAREST_BRIDGE_MAC)/  \
+    LLDPDUChassisID(subtype=c, id=l)/      \
+    LLDPDUPortID(subtype=p, id=l)/         \
+    LLDPDUTimeToLive(ttl=2)/               \
+    LLDPDUEndOfLLDPDU()
+
+try:
+    frm = frm.build()
+except:
+    assert False
+
++ Power via MDI
+~ tshark
+
+= Define check_tshark function
+
+def check_tshark(pkt, frame_type, selector):
+    import tempfile, os
+    fd, pcapfilename = tempfile.mkstemp()
+    wrpcap(pcapfilename, pkt)
+    rv = tcpdump(pcapfilename, prog=conf.prog.tshark, getfd=True,
+                 args=['-Y', frame_type, '-T', 'fields', '-e', selector], dump=True, wait=True)
+    os.close(fd)
+    os.unlink(pcapfilename)
+    return rv.decode("utf8").strip()
+
+= Power via MDI tests
+
+frm = Ether(src='01:01:01:01:01:01', dst=LLDP_NEAREST_BRIDGE_MAC)/\
+      LLDPDUChassisID(subtype=LLDPDUChassisID.SUBTYPE_MAC_ADDRESS, id=b'\x06\x05\x04\x03\x02\x01')/\
+      LLDPDUPortID(subtype=LLDPDUPortID.SUBTYPE_MAC_ADDRESS, id=b'\x01\x02\x03\x04\x05\x06')/\
+      LLDPDUTimeToLive()/\
+      LLDPDUGenericOrganisationSpecific(org_code=LLDPDUGenericOrganisationSpecific.ORG_UNIQUE_CODE_PNO,
+                                        subtype=0x42,
+                                        data=b'FooBar'*5
+                                        )/\
+      LLDPDUPowerViaMDI(MDI_power_support='PSE MDI power enabled+PSE MDI power supported',
+                        PSE_power_pair='alt B',
+                        power_class='class 3')/\
+      LLDPDUEndOfLLDPDU()
+
+frm = frm.build()
+frm = Ether(frm)
+poe_layer = frm[LLDPDUPowerViaMDI]
+# Legacy PoE TLV is not supported by WireShark
+assert poe_layer
+assert poe_layer._type == 127
+assert int(check_tshark(frm, "lldp", "lldp.tlv.type").split(',')[-2], 0) == 127
+assert poe_layer.org_code == LLDPDUGenericOrganisationSpecific.ORG_UNIQUE_CODE_IEEE_802_3
+assert int(check_tshark(frm, "lldp", "lldp.orgtlv.oui").split(',')[-1], 0) == 4623
+assert poe_layer.subtype == 2
+assert int(check_tshark(frm, "lldp", "lldp.ieee.802_3.subtype"), 0) == 0x02
+assert poe_layer._length == 7
+assert int(check_tshark(frm, "lldp", "lldp.tlv.len").split(',')[-2], 0) == 7
+assert poe_layer.MDI_power_support == 6
+assert int(check_tshark(frm, "lldp", "lldp.ieee.802_3.mdi_power_support"), 0) == 6
+assert poe_layer.PSE_power_pair == 2
+assert int(check_tshark(frm, "lldp", "lldp.ieee.802_3.mdi_pse_pair"), 0) == 2
+assert poe_layer.power_class == 4
+assert int(check_tshark(frm, "lldp", "lldp.ieee.802_3.mdi_power_class"), 0) == 4
+
+
+frm = Ether(src='01:01:01:01:01:01', dst=LLDP_NEAREST_BRIDGE_MAC)/\
+            LLDPDUChassisID(subtype=LLDPDUChassisID.SUBTYPE_MAC_ADDRESS, id=b'\x06\x05\x04\x03\x02\x01')/\
+            LLDPDUPortID(subtype=LLDPDUPortID.SUBTYPE_MAC_ADDRESS, id=b'\x01\x02\x03\x04\x05\x06')/\
+            LLDPDUTimeToLive()/\
+            LLDPDUGenericOrganisationSpecific(org_code=LLDPDUGenericOrganisationSpecific.ORG_UNIQUE_CODE_PNO,
+                                              subtype=0x42,
+                                              data=b'FooBar'*5
+                                              )
+# invalid length
+try:
+    Ether((frm/
+           LLDPDUPowerViaMDI(_length=8)/
+           LLDPDUEndOfLLDPDU()).build())
+    assert False
+except LLDPInvalidLengthField:
+    pass
+
+= Power via MDI with DDL classification extension tests
+
+frm = Ether(src='01:01:01:01:01:01', dst=LLDP_NEAREST_BRIDGE_MAC)/\
+      LLDPDUChassisID(subtype=LLDPDUChassisID.SUBTYPE_MAC_ADDRESS, id=b'\x06\x05\x04\x03\x02\x01')/\
+      LLDPDUPortID(subtype=LLDPDUPortID.SUBTYPE_MAC_ADDRESS, id=b'\x01\x02\x03\x04\x05\x06')/\
+      LLDPDUTimeToLive()/\
+      LLDPDUGenericOrganisationSpecific(org_code=LLDPDUGenericOrganisationSpecific.ORG_UNIQUE_CODE_PNO,
+                                        subtype=0x42,
+                                        data=b'FooBar'*5
+                                        )/\
+      LLDPDUPowerViaMDIDDL(MDI_power_support='PSE pairs controlled+PSE MDI power enabled',
+                           PSE_power_pair='alt A',
+                           power_class='class 4 and above',
+			   power_type_no='type 2',
+                           power_type_dir='PSE',
+			   power_source='backup source',
+			   power_prio='high',
+			   PD_requested_power=2.21111,
+			   PSE_allocated_power=1.521212121)/\
+      LLDPDUEndOfLLDPDU()
+
+frm = frm.build()
+frm = Ether(frm)
+poe_layer = frm[LLDPDUPowerViaMDIDDL]
+assert poe_layer
+assert poe_layer._type == 127
+assert int(check_tshark(frm, "lldp", "lldp.tlv.type").split(',')[-2], 0) == 127
+assert poe_layer.org_code == LLDPDUGenericOrganisationSpecific.ORG_UNIQUE_CODE_IEEE_802_3
+assert int(check_tshark(frm, "lldp", "lldp.orgtlv.oui").split(',')[-1], 0) == 4623
+assert poe_layer.subtype == 2
+assert int(check_tshark(frm, "lldp", "lldp.ieee.802_3.subtype"), 0) == 0x02
+assert poe_layer._length == 12
+assert int(check_tshark(frm, "lldp", "lldp.tlv.len").split(',')[-2], 0) == 12
+assert poe_layer.MDI_power_support == 12
+assert int(check_tshark(frm, "lldp", "lldp.ieee.802_3.mdi_power_support"), 0) == 12
+assert poe_layer.PSE_power_pair == 1
+assert int(check_tshark(frm, "lldp", "lldp.ieee.802_3.mdi_pse_pair"), 0) == 1
+# NOTE: wireshark mixes power_prio and PD_4PID fields. Result will be incerrect if PD_4PID==1
+assert poe_layer.power_class == 5
+assert int(check_tshark(frm, "lldp", "lldp.ieee.802_3.mdi_power_class"), 0) == 5
+assert poe_layer.power_type_no == 0
+assert poe_layer.power_type_dir == 0
+assert int(check_tshark(frm, "lldp", "lldp.ieee.802_3.mdi_power_type"), 0) == 0
+assert poe_layer.power_source == 0b10
+assert int(check_tshark(frm, "lldp", "lldp.ieee.802_3.mdi_power_source"), 0) == 0b10
+assert poe_layer.power_prio == 0b10
+assert int(check_tshark(frm, "lldp", "lldp.ieee.802_3.mdi_power_priority"), 0) == 0b10
+assert poe_layer.PD_requested_power == 2.2
+assert int(check_tshark(frm, "lldp", "lldp.ieee.802_3.mdi_pde_requested"), 0) == 22
+assert poe_layer.PSE_allocated_power == 1.5
+assert int(check_tshark(frm, "lldp", "lldp.ieee.802_3.mdi_pse_allocated"), 0) == 15
+
+
+frm = Ether(src='01:01:01:01:01:01', dst=LLDP_NEAREST_BRIDGE_MAC)/\
+            LLDPDUChassisID(subtype=LLDPDUChassisID.SUBTYPE_MAC_ADDRESS, id=b'\x06\x05\x04\x03\x02\x01')/\
+            LLDPDUPortID(subtype=LLDPDUPortID.SUBTYPE_MAC_ADDRESS, id=b'\x01\x02\x03\x04\x05\x06')/\
+            LLDPDUTimeToLive()/\
+            LLDPDUGenericOrganisationSpecific(org_code=LLDPDUGenericOrganisationSpecific.ORG_UNIQUE_CODE_PNO,
+                                              subtype=0x42,
+                                              data=b'FooBar'*5
+                                              )
+# invalid length
+try:
+    Ether((frm/
+           LLDPDUPowerViaMDIDDL(_length=8)/
+           LLDPDUEndOfLLDPDU()).build())
+    assert False
+except LLDPInvalidLengthField:
+    pass
+
+# invalid power
+try:
+    Ether((frm/
+           LLDPDUPowerViaMDIDDL(PD_requested_power=100)/
+           LLDPDUEndOfLLDPDU()).build())
+    assert False
+except LLDPInvalidFieldValue:
+    pass
+
+try:
+    Ether((frm/
+           LLDPDUPowerViaMDIDDL(PSE_allocated_power=100)/
+           LLDPDUEndOfLLDPDU()).build())
+    assert False
+except LLDPInvalidFieldValue:
+    pass
+
+= Power via MDI with DDL classification and Type 3 and 4 extensions tests
+
+frm = Ether(src='01:01:01:01:01:01', dst=LLDP_NEAREST_BRIDGE_MAC)/\
+      LLDPDUChassisID(subtype=LLDPDUChassisID.SUBTYPE_MAC_ADDRESS, id=b'\x06\x05\x04\x03\x02\x01')/\
+      LLDPDUPortID(subtype=LLDPDUPortID.SUBTYPE_MAC_ADDRESS, id=b'\x01\x02\x03\x04\x05\x06')/\
+      LLDPDUTimeToLive()/\
+      LLDPDUGenericOrganisationSpecific(org_code=LLDPDUGenericOrganisationSpecific.ORG_UNIQUE_CODE_PNO,
+                                        subtype=0x42,
+                                        data=b'FooBar'*5
+                                        )/\
+      LLDPDUPowerViaMDIType34(MDI_power_support='port class PSE+PSE pairs controlled+PSE MDI power enabled',
+                              PSE_power_pair='alt B',
+                              power_class='class 2',
+                              power_type_no='type 1',
+                              power_type_dir='PD',
+                              power_source='PSE and local',
+                              PD_4PID='not supported',
+                              power_prio='low',
+                              PD_requested_power=12.21111,
+                              PSE_allocated_power=11.521212121,
+                              PD_requested_power_mode_A=2.3,
+                              PD_requested_power_mode_B=3.3,
+                              PD_allocated_power_alt_A=3.1,
+                              PD_allocated_power_alt_B=0.5,
+                              PSE_powering_status='4-pair powering single-signature PD',
+                              PD_powered_status='powered single-signature PD',
+                              PD_power_pair_ext='both alts',
+                              dual_signature_class_mode_A='class 4',
+                              dual_signature_class_mode_B='class 2',
+                              power_class_ext='dual-signature pd',
+                              power_type_ext='type 4 single-signature PD',
+                              PD_load='dual-signature and electrically isolated',
+                              PSE_max_available_power=33.333,
+                              autoclass='autoclass completed+autoclass request',
+                              power_down_req='power down',
+                              power_down_time=123)/\
+    LLDPDUEndOfLLDPDU()
+
+frm = frm.build()
+frm = Ether(frm)
+poe_layer = frm[LLDPDUPowerViaMDIType34]
+assert poe_layer
+assert poe_layer._type == 127
+assert int(check_tshark(frm, "lldp", "lldp.tlv.type").split(',')[-2], 0) == 127
+assert poe_layer.org_code == LLDPDUGenericOrganisationSpecific.ORG_UNIQUE_CODE_IEEE_802_3
+assert int(check_tshark(frm, "lldp", "lldp.orgtlv.oui").split(',')[-1], 0) == 4623
+assert poe_layer.subtype == 2
+assert int(check_tshark(frm, "lldp", "lldp.ieee.802_3.subtype"), 0) == 0x02
+assert poe_layer._length == 29
+assert int(check_tshark(frm, "lldp", "lldp.tlv.len").split(',')[-2], 0) == 29
+assert poe_layer.MDI_power_support == 13
+assert int(check_tshark(frm, "lldp", "lldp.ieee.802_3.mdi_power_support"), 0) == 13
+assert poe_layer.PSE_power_pair == 2
+assert int(check_tshark(frm, "lldp", "lldp.ieee.802_3.mdi_pse_pair"), 0) == 2
+# NOTE: wireshark mixes power_prio and PD_4PID fields. Result will be incerrect if PD_4PID==1
+assert poe_layer.PD_4PID == 0
+assert poe_layer.power_class == 3
+assert int(check_tshark(frm, "lldp", "lldp.ieee.802_3.mdi_power_class"), 0) == 3
+assert poe_layer.power_type_no == 1
+assert poe_layer.power_type_dir == 1
+assert int(check_tshark(frm, "lldp", "lldp.ieee.802_3.mdi_power_type"), 0) == 3
+assert poe_layer.power_source == 0b11
+assert int(check_tshark(frm, "lldp", "lldp.ieee.802_3.mdi_power_source"), 0) == 0b11
+assert poe_layer.power_prio == 0b11
+assert int(check_tshark(frm, "lldp", "lldp.ieee.802_3.mdi_power_priority"), 0) == 0b11
+assert poe_layer.PD_requested_power == 12.2
+assert int(check_tshark(frm, "lldp", "lldp.ieee.802_3.mdi_pde_requested"), 0) == 122
+assert poe_layer.PSE_allocated_power == 11.5
+assert int(check_tshark(frm, "lldp", "lldp.ieee.802_3.mdi_pse_allocated"), 0) == 115
+assert poe_layer.PD_requested_power_mode_A == 2.3
+assert int(check_tshark(frm, "lldp", "lldp.ieee.802_3.bt_ds_pd_requested_power_value_mode_a"), 0) == 23
+assert poe_layer.PD_requested_power_mode_B == 3.3
+assert int(check_tshark(frm, "lldp", "lldp.ieee.802_3.bt_ds_pd_requested_power_value_mode_b"), 0) == 33
+assert poe_layer.PD_allocated_power_alt_A == 3.1
+assert int(check_tshark(frm, "lldp", "lldp.ieee.802_3.bt_ds_pse_allocated_power_value_alt_a"), 0) == 31
+assert poe_layer.PD_allocated_power_alt_B == 0.5
+assert int(check_tshark(frm, "lldp", "lldp.ieee.802_3.bt_ds_pse_allocated_power_value_alt_b"), 0) == 5
+assert poe_layer.PSE_powering_status == 2
+assert int(check_tshark(frm, "lldp", "lldp.ieee.802_3.bt_pse_powering_status"), 0) == 2
+assert poe_layer.PD_powered_status == 1
+assert int(check_tshark(frm, "lldp", "lldp.ieee.802_3.bt_pd_powered_status"), 0) == 1
+assert poe_layer.PD_power_pair_ext == 3
+assert int(check_tshark(frm, "lldp", "lldp.ieee.802_3.bt_pse_power_pairs_ext"), 0) == 3
+assert poe_layer.dual_signature_class_mode_A == 4
+assert int(check_tshark(frm, "lldp", "lldp.ieee.802_3.bt_ds_pwr_class_ext_a"), 0) == 4
+assert poe_layer.dual_signature_class_mode_B == 2
+assert int(check_tshark(frm, "lldp", "lldp.ieee.802_3.bt_ds_pwr_class_ext_b"), 0) == 2
+assert poe_layer.power_class_ext == 15
+assert int(check_tshark(frm, "lldp", "lldp.ieee.802_3.bt_pwr_class_ext_"), 0) == 15
+assert poe_layer.power_type_ext == 4
+assert int(check_tshark(frm, "lldp", "lldp.ieee.802_3.bt_power_type_ext"), 0) == 4
+assert poe_layer.PD_load == 1
+assert poe_layer.PSE_max_available_power == 33.3
+assert int(check_tshark(frm, "lldp", "lldp.ieee.802_3.bt_pse_maximum_available_power_value"), 0) == 333
+assert poe_layer.autoclass == 3
+assert int(check_tshark(frm, "lldp", "lldp.ieee.802_3.bt_autoclass"), 0) == 3
+assert poe_layer.power_down_req == 0x1d
+assert int(check_tshark(frm, "lldp", "lldp.ieee.802_3.bt_power_down_request"), 0) == 0x1d
+assert poe_layer.power_down_time == 123
+assert int(check_tshark(frm, "lldp", "lldp.ieee.802_3.bt_power_down_time"), 0) == 123
+
+
+frm = Ether(src='01:01:01:01:01:01', dst=LLDP_NEAREST_BRIDGE_MAC)/\
+            LLDPDUChassisID(subtype=LLDPDUChassisID.SUBTYPE_MAC_ADDRESS, id=b'\x06\x05\x04\x03\x02\x01')/\
+            LLDPDUPortID(subtype=LLDPDUPortID.SUBTYPE_MAC_ADDRESS, id=b'\x01\x02\x03\x04\x05\x06')/\
+            LLDPDUTimeToLive()/\
+            LLDPDUGenericOrganisationSpecific(org_code=LLDPDUGenericOrganisationSpecific.ORG_UNIQUE_CODE_PNO,
+                                              subtype=0x42,
+                                              data=b'FooBar'*5
+                                              )
+# invalid length
+try:
+    Ether((frm/
+           LLDPDUPowerViaMDIType34(_length=8)/
+           LLDPDUEndOfLLDPDU()).build())
+    assert False
+except LLDPInvalidLengthField:
+    pass
+
+# invalid power
+try:
+    Ether((frm/
+           LLDPDUPowerViaMDIType34(PD_requested_power=100)/
+           LLDPDUEndOfLLDPDU()).build())
+    assert False
+except LLDPInvalidFieldValue:
+    pass
+
+try:
+    Ether((frm/
+           LLDPDUPowerViaMDIType34(PSE_allocated_power=100)/
+           LLDPDUEndOfLLDPDU()).build())
+    assert False
+except LLDPInvalidFieldValue:
+    pass
+
+try:
+    Ether((frm/
+           LLDPDUPowerViaMDIType34(PD_requested_power_mode_A=50)/
+           LLDPDUEndOfLLDPDU()).build())
+    assert False
+except LLDPInvalidFieldValue:
+    pass
+
+try:
+    Ether((frm/
+           LLDPDUPowerViaMDIType34(PD_requested_power_mode_B=50)/
+           LLDPDUEndOfLLDPDU()).build())
+    assert False
+except LLDPInvalidFieldValue:
+    pass
+
+try:
+    Ether((frm/
+           LLDPDUPowerViaMDIType34(PD_allocated_power_alt_A=50)/
+           LLDPDUEndOfLLDPDU()).build())
+    assert False
+except LLDPInvalidFieldValue:
+    pass
+
+try:
+    Ether((frm/
+           LLDPDUPowerViaMDIType34(PD_allocated_power_alt_B=50)/
+           LLDPDUEndOfLLDPDU()).build())
+    assert False
+except LLDPInvalidFieldValue:
+    pass
+
+try:
+    Ether((frm/
+           LLDPDUPowerViaMDIType34(PSE_max_available_power=100)/
+           LLDPDUEndOfLLDPDU()).build())
+    assert False
+except LLDPInvalidFieldValue:
+    pass
+
+# invalid time
+try:
+    Ether((frm/
+           LLDPDUPowerViaMDIType34(power_down_time=(1<<18))/
+           LLDPDUEndOfLLDPDU()).build())
+    assert False
+except LLDPInvalidFieldValue:
+    pass
+
+= Power via MDI measurements tests
+
+import struct
+
+frm = Ether(src='01:01:01:01:01:01', dst=LLDP_NEAREST_BRIDGE_MAC)/\
+    LLDPDUChassisID(subtype=LLDPDUChassisID.SUBTYPE_MAC_ADDRESS, id=b'\x06\x05\x04\x03\x02\x01')/\
+    LLDPDUPortID(subtype=LLDPDUPortID.SUBTYPE_MAC_ADDRESS, id=b'\x01\x02\x03\x04\x05\x06')/\
+    LLDPDUTimeToLive()/\
+    LLDPDUGenericOrganisationSpecific(org_code=LLDPDUGenericOrganisationSpecific.ORG_UNIQUE_CODE_PNO,
+                                      subtype=0x42,
+                                      data=b'FooBar'*5
+                                      )/\
+    LLDPDUPowerViaMDIMeasure(support='power+current',
+                             source='mode B',
+                             request='energy+voltage+current',
+                             valid='power',
+                             voltage_uncertainty=52.25,
+                             current_uncertainty=3.211,
+                             power_uncertainty=140,
+                             energy_uncertainty=2600,
+                             voltage_measurement=22.123,
+                             current_measurement=3.2121,
+                             power_measurement=123.12,
+                             energy_measurement=21123400,
+                             power_price_index='not available')/\
+    LLDPDUEndOfLLDPDU()
+
+frm = frm.build()
+frm = Ether(frm)
+poe_layer = frm[LLDPDUPowerViaMDIMeasure]
+poe_layer_raw = raw(poe_layer)
+
+# PoE measure TLV is not supported by WireShark
+
+assert poe_layer
+assert poe_layer._type == 127
+assert poe_layer.org_code == LLDPDUGenericOrganisationSpecific.ORG_UNIQUE_CODE_IEEE_802_3
+assert poe_layer.subtype == 8
+assert poe_layer._length == 26
+assert poe_layer.support == 0b0110
+assert poe_layer.source == 0b10
+assert poe_layer.request == 0b1101
+assert poe_layer.valid == 0b0010
+assert poe_layer.voltage_uncertainty == 52.25
+assert struct.unpack(">H", poe_layer_raw[8:10])[0] == 52250
+assert poe_layer.current_uncertainty == 3.211
+assert struct.unpack(">H", poe_layer_raw[10:12])[0] == 32110
+assert poe_layer.power_uncertainty == 140
+assert struct.unpack(">H", poe_layer_raw[12:14])[0] == 14000
+assert poe_layer.energy_uncertainty == 2600
+assert struct.unpack(">H", poe_layer_raw[14:16])[0] == 26
+assert poe_layer.voltage_measurement == 22.123
+assert struct.unpack(">H", poe_layer_raw[16:18])[0] == 22123
+assert poe_layer.current_measurement == 3.2121
+assert struct.unpack(">H", poe_layer_raw[18:20])[0] == 32121
+assert poe_layer.power_measurement == 123.12
+assert struct.unpack(">H", poe_layer_raw[20:22])[0] == 12312
+assert poe_layer.energy_measurement == 21123400
+assert struct.unpack(">I", poe_layer_raw[22:26])[0] == 211234
+assert poe_layer.power_price_index == 0xffff
+
+frm = Ether(src='01:01:01:01:01:01', dst=LLDP_NEAREST_BRIDGE_MAC)/\
+            LLDPDUChassisID(subtype=LLDPDUChassisID.SUBTYPE_MAC_ADDRESS, id=b'\x06\x05\x04\x03\x02\x01')/\
+            LLDPDUPortID(subtype=LLDPDUPortID.SUBTYPE_MAC_ADDRESS, id=b'\x01\x02\x03\x04\x05\x06')/\
+            LLDPDUTimeToLive()/\
+            LLDPDUGenericOrganisationSpecific(org_code=LLDPDUGenericOrganisationSpecific.ORG_UNIQUE_CODE_PNO,
+                                              subtype=0x42,
+                                              data=b'FooBar'*5
+                                              )
+# invalid length
+try:
+    Ether((frm/
+           LLDPDUPowerViaMDIMeasure(_length=8)/
+           LLDPDUEndOfLLDPDU()).build())
+    assert False
+except LLDPInvalidLengthField:
+    pass
+
+# invalid voltage
+try:
+    Ether((frm/
+           LLDPDUPowerViaMDIMeasure(voltage_uncertainty=500)/
+           LLDPDUEndOfLLDPDU()).build())
+    assert False
+except LLDPInvalidFieldValue:
+    pass
+
+try:
+    Ether((frm/
+           LLDPDUPowerViaMDIMeasure(voltage_measurement=500)/
+           LLDPDUEndOfLLDPDU()).build())
+    assert False
+except LLDPInvalidFieldValue:
+    pass
+
+# invalid current
+try:
+    Ether((frm/
+           LLDPDUPowerViaMDIMeasure(current_uncertainty=500)/
+           LLDPDUEndOfLLDPDU()).build())
+    assert False
+except LLDPInvalidFieldValue:
+    pass
+
+try:
+    Ether((frm/
+           LLDPDUPowerViaMDIMeasure(current_measurement=500)/
+           LLDPDUEndOfLLDPDU()).build())
+    assert False
+except LLDPInvalidFieldValue:
+    pass
+
+# invalid energy
+try:
+    Ether((frm/
+           LLDPDUPowerViaMDIMeasure(energy_uncertainty=66000000)/
+           LLDPDUEndOfLLDPDU()).build())
+    assert False
+except LLDPInvalidFieldValue:
+    pass
+
+# invalid power
+try:
+    Ether((frm/
+           LLDPDUPowerViaMDIMeasure(power_uncertainty=5000)/
+           LLDPDUEndOfLLDPDU()).build())
+    assert False
+except LLDPInvalidFieldValue:
+    pass
+
+try:
+    Ether((frm/
+           LLDPDUPowerViaMDIMeasure(power_measurement=5000)/
+           LLDPDUEndOfLLDPDU()).build())
+    assert False
+except LLDPInvalidFieldValue:
+    pass
+
+# invalid power price index
+try:
+    Ether((frm/
+           LLDPDUPowerViaMDIMeasure(power_price_index=150)/
+           LLDPDUEndOfLLDPDU()).build())
+    assert False
+except LLDPInvalidFieldValue:
+    pass
