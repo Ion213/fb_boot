@@ -3,7 +3,7 @@ from fbchat_muqit import Message, MessageReaction
 async def filter_messages(self, mid, author_id, user_message, thread_id, thread_type, current_time):
     """Checks for blocked words and warns the user if needed."""
     
-    if any(blocked_word in user_message for blocked_word in self.blocked_words):
+    if any(blocked_word in user_message.lower() for blocked_word in self.blocked_words):
         last_warning = self.warning_cooldown.get(author_id, 0)
 
         # Allow the user to send messages after cooldown
