@@ -1,4 +1,5 @@
 lib
 key/encrypted_cookies.bin
+modules/mitmproxy-11.0.2
 export.sh
 run.sh
